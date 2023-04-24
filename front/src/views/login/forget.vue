@@ -1,0 +1,366 @@
+<template>
+    <div class="login-container">
+        <el-form ref="loginForm" :model="loginForm" :rules="loginRules" :class="loginFormClass" auto-complete="on"
+            label-position="left">
+
+            <div class="title-container">
+                <h3 :class="titleClass">重置密码</h3>
+            </div>
+            <el-form-item prop="email" class="input-box">
+                <span class="svg-container">
+                    <svg-icon icon-class="email" />
+                </span>
+                <el-input ref="email" v-model="loginForm.email" placeholder="邮箱" name="email" type="email" tabindex="1"
+                    auto-complete="on" /> 
+            </el-form-item>
+            <el-button :loading="Emailloading" type="primary" style="width:25%;margin-bottom:30px;"
+                @click.native.prevent="sendEmail">发送验证码</el-button>
+
+            <el-form-item prop="emailConfirm" class="input-box">
+                <span class="svg-container">
+                    <svg-icon icon-class="example" />
+                </span>
+                <el-input ref="emailConfirm" v-model="loginForm.emailConfirm" placeholder="验证码" name="emailConfirm" type="text"
+                    tabindex="2" auto-complete="off" />
+            </el-form-item>
+
+            <el-form-item prop="password" class="input-box">
+                <span class="svg-container">
+                    <svg-icon icon-class="password" />
+                </span>
+                <el-input :key="passwordType" ref="password" v-model="loginForm.password" :type="passwordType"
+                    placeholder="密码" name="password" tabindex="3" auto-complete="on"
+                     />
+                <span class="show-pwd" @click="showPwd">
+                    <svg-icon :icon-class="passwordType === 'password' ? 'eye' : 'eye-open'" />
+                </span>
+            </el-form-item>
+
+            <el-form-item prop="confirmPassword" class="input-box">
+                <span class="svg-container">
+                    <svg-icon icon-class="password" />
+                </span>
+                <el-input :key="confirmPasswordType" ref="confirmPassword" v-model="loginForm.confirmPassword"
+                    :type="confirmPasswordType" placeholder="确认密码" name="confirmPassword" tabindex="3" auto-complete="on"
+                     />
+                <span class="show-pwd" @click="showConfirmPwd">
+                    <svg-icon :icon-class="confirmPasswordType === 'password' ? 'eye' : 'eye-open'" />
+                </span>
+            </el-form-item>
+
+            <el-button :loading="loading" type="primary" style="width:25%;margin-bottom:30px;"
+                @click.native.prevent="handleLogin">返回登录</el-button>
+            <el-button type="success" style="width:25%;margin-left: 50%;" @click.native.prevent="handleForget">重置密码
+            </el-button>
+
+            <!-- <div class="tips">
+          <span style="margin-right:20px;">username: admin</span>
+          <span> password: any</span>
+        </div> -->
+
+        </el-form>
+    </div>
+</template>
+  
+<script>
+import{forget,reset} from '@/api/user'
+export default {
+    name: 'Login',
+    data() {
+        const validateEmail = (rule, value, callback) => {
+
+            var reg = /^([a-zA-Z]|[0-9])(\w|\-)+@[a-zA-Z0-9]+\.([a-zA-Z]{2,4})$/;
+            if(!value)
+            {
+                callback(new Error('请输入邮箱'))
+            }
+            setTimeout(() => {
+                if (value && !reg.test(value)) {
+                    callback(new Error('请输入正确的邮箱'));
+                } else {
+                    callback()
+                }
+            },100);
+        }
+      const validateemailConfirm = (rule, value, callback) => {
+        if (!value) {
+            callback(new Error('请输入验证码'))
+        }else if(value!=this.confirmCode){
+            callback(new Error('请输入正确的验证码'))
+        } 
+        else {
+            callback()
+        }
+    }
+      const validatePassword = (rule, value, callback) => {
+        var reg=/^[A-Za-z]+[0-9]+\S*/
+        if (!value) {
+            callback(new Error('请输入密码'))
+        } else if(value.length<6||value.length>19 || !reg.test(value)){
+            callback(new Error('密码长度必须大于6小于20,由字母开头并且含有数字'))
+        }else {
+            if (this.loginForm.password !== '') {
+            this.$refs.loginForm.validateField('confirmPassword');
+          }
+            callback()
+        }
+    }
+    const validateConfirmPassword = (rule, value, callback) => {
+        if (!value) {
+            callback(new Error('请重新输入密码'))
+        } else if(value!==this.loginForm.password){
+            callback(new Error('两次密码必须一致!'))
+        }else {
+            callback()
+        }
+    }
+      return {
+        loginForm: {
+            email: '',
+            emailConfirm: '',
+            password: '',
+            confirmPassword: ''
+
+        },
+        loginRules: {
+            email: [{ required:true,trigger:['blur', 'change'],validator: validateEmail }],
+            emailConfirm: [{ required: true, trigger: 'blur', validator: validateemailConfirm }],
+            password: [{ required: true, trigger: 'blur', validator: validatePassword }],
+            confirmPassword:[{required:true,trigger:'blur',validator: validateConfirmPassword}]
+        },
+        loading: false,
+        passwordType: 'password',
+        confirmPasswordType: 'password',
+        redirect: undefined,
+        titleClass: 'title',
+        loginFormClass: 'login-form',
+        Emailloading:false,
+        confirmCode:null
+    }
+},
+watch: {
+    $route: {
+        handler: function(route) {
+            this.redirect = route.query && route.query.redirect
+            console.log(this.redirect)
+        },
+        immediate: true
+    }
+},
+methods: {
+    sendEmail(){
+        this.Emailloading = true 
+        this.$refs.loginForm.validateField(["email"],async valid => {
+        if (!valid) {
+        
+        forget({id:this.loginForm.email,code:''}).then(response=>{
+            this.confirmCode=response.data.code
+
+            console.log(response)
+        })
+        this.Emailloading=false
+          
+        } else {
+          console.log('error submit!!')
+          this.Emailloading=false
+          return false
+        }
+      })
+    },
+    showPwd() {
+        if (this.passwordType === 'password') {
+            this.passwordType = ''
+        } else {
+            this.passwordType = 'password'
+        }
+        this.$nextTick(() => {
+            this.$refs.password.focus()
+        })
+    },
+    showConfirmPwd() {
+        if (this.confirmPasswordType === 'password') {
+            this.confirmPasswordType = ''
+        } else {
+            this.confirmPasswordType = 'password'
+        }
+        this.$nextTick(() => {
+            this.$refs.confirmPassword.focus()
+        })
+    },
+    handleLogin() {
+        this.titleClass = 'title-leave'
+        setTimeout(() => {
+            this.loginFormClass = 'login-form-leave'
+        }, 500)
+
+        setTimeout(() => {
+            this.$router.push({path:'/login',query:{from:'forget'}})
+            this.loading = false
+        }, 1000)
+
+    },
+    handleForget(){
+        this.loading = true
+        this.$refs.loginForm.validate(valid => {
+        if (valid) {
+            reset({id:this.loginForm.email,code:this.loginForm.emailConfirm,pwd:this.loginForm.password}).then(response=>{
+                console.log(response)
+                this.$router.push({ path: this.redirect || '/login' })
+            })
+            this.loading = true
+        } else {
+          console.log('error submit!!')
+          return false
+        }
+      })    
+        
+
+    }
+}
+  }
+</script>
+  
+<style lang="scss">
+/* 修复input 背景不协调 和光标变色 */
+/* Detail see https://github.com/PanJiaChen/vue-element-admin/pull/927 */
+
+$bg: #283443;
+$light_gray: #fff;
+$cursor: #fff;
+
+@supports (-webkit-mask: none) and (not (cater-color: $cursor)) {
+    .login-container .el-input input {
+        color: $cursor;
+    }
+}
+
+/* reset element-ui css */
+.login-container {
+    .el-input {
+        display: inline-block;
+        height: 47px;
+        width: 85%;
+
+        input {
+            background: transparent;
+            border: 0px;
+            -webkit-appearance: none;
+            border-radius: 0px;
+            padding: 12px 5px 12px 15px;
+            color: $light_gray;
+            height: 47px;
+            caret-color: $cursor;
+
+            &:-webkit-autofill {
+                box-shadow: 0 0 0px 1000px $bg inset !important;
+                -webkit-text-fill-color: $cursor !important;
+            }
+        }
+    }
+
+    .input-box {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        background: rgba(0, 0, 0, 0.1);
+        border-radius: 5px;
+        color: #454545;
+    }
+}
+</style>
+  
+<style lang="scss" scoped>
+$bg: #2d3a4b;
+$dark_gray: #889aa4;
+$light_gray: #eee;
+
+.login-container {
+    min-height: 100%;
+    width: 100%;
+    background-color: $bg;
+    overflow: hidden;
+
+    .login-form {
+        position: relative;
+        width: 520px;
+        max-width: 100%;
+        padding: 160px 35px 0;
+        margin: 0 auto;
+        overflow: hidden;
+        animation: rollIn;
+        /* referring directly to the animation's @keyframe declaration */
+        animation-duration: 1s;
+        /* don't forget to set a duration! */
+    }
+
+    .login-form-leave {
+        position: relative;
+        width: 520px;
+        max-width: 100%;
+        padding: 160px 35px 0;
+        margin: 0 auto;
+        overflow: hidden;
+        animation: rollOut;
+        /* referring directly to the animation's @keyframe declaration */
+        animation-duration: 1s;
+        /* don't forget to set a duration! */
+    }
+
+    .tips {
+        font-size: 14px;
+        color: #fff;
+        margin-bottom: 10px;
+
+        span {
+            &:first-of-type {
+                margin-right: 16px;
+            }
+        }
+    }
+
+    .svg-container {
+        padding: 6px 5px 6px 15px;
+        color: $dark_gray;
+        vertical-align: middle;
+        width: 30px;
+        display: inline-block;
+    }
+
+    .title-container {
+        position: relative;
+
+        .title {
+            font-size: 26px;
+            color: $light_gray;
+            margin: 0px auto 40px auto;
+            text-align: center;
+            font-weight: bold;
+            animation: bounceInLeft;
+            /* referring directly to the animation's @keyframe declaration */
+            animation-duration: 1s;
+            /* don't forget to set a duration! */
+        }
+
+        .title-leave {
+            font-size: 26px;
+            color: $light_gray;
+            margin: 0px auto 40px auto;
+            text-align: center;
+            font-weight: bold;
+            animation: bounceOutRight;
+            /* referring directly to the animation's @keyframe declaration */
+            animation-duration: 2s;
+            /* don't forget to set a duration! */
+        }
+    }
+
+    .show-pwd {
+        position: absolute;
+        right: 10px;
+        top: 7px;
+        font-size: 16px;
+        color: $dark_gray;
+        cursor: pointer;
+        user-select: none;
+    }
+}
+</style>
+  
